@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resistor Measurement, Thermal Noise & Uncertainty Simulator</title>
+  <meta name="description" content="Interactive simulator exploring thermal noise (random error) and multimeter calibration offset (systematic error) in resistor measurements.">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.2.1/dist/chartjs-plugin-annotation.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-deep:    #020817;
+      --bg-panel:   #0f172a;
+      --bg-card:    #1e293b;
+      --border:     #1e293b;
+      --border-bright: #334155;
+      --indigo:     #6366f1;
+      --cyan:       #22d3ee;
+      --amber:      #f59e0b;
+      --red:        #ef4444;
+      --emerald:    #10b981;
+      --text:       #e2e8f0;
+      --text-muted: #64748b;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-deep);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 1rem;
+    }
+
+    @media (min-width: 640px) { body { padding: 1.5rem; } }
+
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg-deep); }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+
+    .app { max-width: 1600px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.25rem; }
+
+    .grid-12 { display: grid; gap: 1.25rem; }
+    @media (min-width: 1024px) { .grid-12 { grid-template-columns: repeat(12, 1fr); } }
+
+    .col-5  { grid-column: span 5; }
+    .col-7  { grid-column: span 7; }
+    .col-12 { grid-column: span 12; }
+
+    .grid-2 { display: grid; gap: 1.25rem; grid-template-columns: 1fr; }
+    @media (min-width: 640px) { .grid-2 { grid-template-columns: repeat(2, 1fr); } }
+
+    .panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-bright);
+      border-radius: 1.25rem;
+      padding: 1.25rem;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.5);
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.75rem;
+      margin-bottom: 0.75rem;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .panel-title {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #fff;
+    }
+
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    .dot-pulse { animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    .badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.62rem;
+      font-weight: 700;
+      padding: 0.2rem 0.55rem;
+      border-radius: 0.4rem;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+
+    .slider-group {
+      background: rgba(2,8,23,0.6);
+      border: 1px solid rgba(51,65,85,0.8);
+      border-radius: 0.75rem;
+      padding: 0.875rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .slider-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.78rem;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .slider-label { display: flex; align-items: center; gap: 0.5rem; color: #e2e8f0; font-weight: 500; }
+
+    .slider-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.15rem 0.55rem;
+      border-radius: 0.35rem;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+
+    .slider-hints {
+      display: flex;
+      justify-content: space-between;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      color: var(--text-muted);
+    }
+
+    input[type=range] { -webkit-appearance: none; appearance: none; background: transparent; width: 100%; cursor: pointer; }
+    input[type=range]:focus { outline: none; }
+    input[type=range]::-webkit-slider-runnable-track { height: 6px; background: #1e293b; border-radius: 3px; }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: var(--indigo);
+      margin-top: -6px;
+      box-shadow: 0 0 8px rgba(99,102,241,0.6);
+      transition: transform 0.1s;
+    }
+    input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+    .range-red::-webkit-slider-thumb   { background: var(--red)   !important; box-shadow: 0 0 10px rgba(239,68,68,0.7)   !important; }
+    .range-amber::-webkit-slider-thumb { background: var(--amber) !important; box-shadow: 0 0 10px rgba(245,158,11,0.7) !important; }
+    .range-cyan::-webkit-slider-thumb  { background: var(--cyan)  !important; box-shadow: 0 0 10px rgba(34,211,238,0.7)  !important; }
+
+    .metric-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-bright);
+      border-radius: 1.25rem;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 0.5rem;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.5);
+    }
+
+    .metric-label { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+    .metric-sub   { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; margin-top: 0.1rem; }
+    .metric-value { font-family: 'JetBrains Mono', monospace; font-size: 1.75rem; font-weight: 800; line-height: 1.1; }
+    .metric-detail { font-size: 0.68rem; color: var(--text-muted); }
+    .metric-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 0.5rem; font-size: 0.62rem; color: var(--text-muted); }
+
+    .canvas-wrap { position: relative; width: 100%; border-radius: 0.75rem; border: 1px solid var(--border-bright); overflow: hidden; background: #020817; }
+    .canvas-overlay {
+      position: absolute;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      background: rgba(15,23,42,0.88);
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(51,65,85,0.6);
+      padding: 0.25rem 0.55rem;
+      border-radius: 0.4rem;
+      color: #cbd5e1;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      border: 1px solid rgba(129,140,248,0.3);
+      color: #fff;
+      font-weight: 600;
+      font-size: 0.85rem;
+      padding: 0.6rem 1.25rem;
+      border-radius: 0.75rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: filter 0.15s, transform 0.1s;
+      box-shadow: 0 4px 16px rgba(99,102,241,0.25);
+    }
+    .btn-primary:hover { filter: brightness(1.12); transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(0); }
+
+    .info-box {
+      background: rgba(30,27,75,0.4);
+      border: 1px solid rgba(99,102,241,0.2);
+      border-radius: 0.75rem;
+      padding: 0.75rem;
+      font-size: 0.7rem;
+      color: rgba(199,210,254,0.85);
+      display: flex;
+      gap: 0.6rem;
+      align-items: flex-start;
+    }
+
+    .band-legend { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; }
+    .band-legend-item { display: flex; align-items: center; gap: 0.3rem; color: #94a3b8; }
+    .band-swatch { width: 12px; height: 12px; border-radius: 2px; border: 1px solid rgba(255,255,255,0.2); flex-shrink: 0; }
+
+    @media (max-width: 1023px) { .col-5, .col-7, .col-12 { grid-column: span 12; } }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HEADER -->
+  <header class="panel" style="display:flex;flex-direction:column;gap:1rem;">
+    <div style="display:flex;align-items:center;gap:0.75rem;">
+      <div style="padding:0.6rem;background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);border-radius:0.75rem;">
+        <svg width="22" height="22" fill="none" stroke="#818cf8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      </div>
+      <div>
+        <h1 style="font-size:clamp(1rem,2.2vw,1.4rem);font-weight:800;color:#fff;letter-spacing:-0.02em;">
+          Resistor Uncertainty, Thermal Noise &amp; Calibration Simulator
+        </h1>
+        <p style="font-size:0.72rem;color:#64748b;margin-top:0.2rem;">
+          Explore thermal electron collisions (Random Error) vs. multimeter zero-point offset (Systematic Error).
+        </p>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;">
+      <button id="resampleBtn" class="btn-primary">
+        <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        Re-Sample Measurements
+      </button>
+    </div>
+  </header>
+
+  <!-- CONTROLS + METRICS -->
+  <div class="grid-12">
+
+    <!-- Sliders -->
+    <div class="panel col-5" style="display:flex;flex-direction:column;gap:1rem;">
+      <div class="panel-header" style="margin-bottom:0;">
+        <div class="panel-title">
+          <svg width="17" height="17" fill="none" stroke="#818cf8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+          Experiment Controls
+        </div>
+        <span class="badge" style="background:#1e293b;color:#94a3b8;border-color:#334155;">Live Physics Engine</span>
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-row">
+          <label for="nominalSlider" class="slider-label">
+            <span class="dot" style="background:var(--indigo);"></span>
+            Nominal Resistance (R<sub style="font-size:0.6em;">expected</sub>)
+          </label>
+          <span id="nominalVal" class="slider-val" style="background:rgba(99,102,241,0.1);color:#818cf8;border-color:rgba(99,102,241,0.25);">5.600 kΩ</span>
+        </div>
+        <input type="range" id="nominalSlider" min="1.0" max="10.0" step="0.1" value="5.6">
+        <div class="slider-hints"><span>1.0 kΩ</span><span>Expected Nominal Value</span><span>10.0 kΩ</span></div>
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-row">
+          <label for="tempSlider" class="slider-label">
+            <span class="dot dot-pulse" style="background:var(--red);"></span>
+            Resistor Temperature (T)
+          </label>
+          <span id="tempVal" class="slider-val" style="background:rgba(239,68,68,0.1);color:#f87171;border-color:rgba(239,68,68,0.25);">300 K (27°C)</span>
+        </div>
+        <input type="range" id="tempSlider" min="10" max="800" step="10" value="300" class="range-red">
+        <div class="slider-hints"><span>10 K (Cryo)</span><span style="color:rgba(248,113,113,0.8);">Controls Particle Speed &amp; Jitter</span><span>800 K (Hot)</span></div>
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-row">
+          <label for="systematicSlider" class="slider-label">
+            <span class="dot" style="background:var(--amber);"></span>
+            Systematic Offset Error
+          </label>
+          <span id="systematicVal" class="slider-val" style="background:rgba(245,158,11,0.1);color:#fbbf24;border-color:rgba(245,158,11,0.25);">+0.150 kΩ</span>
+        </div>
+        <input type="range" id="systematicSlider" min="-2.00" max="2.00" step="0.02" value="0.15" class="range-amber">
+        <div class="slider-hints"><span>−2.00 kΩ</span><span style="color:rgba(251,191,36,0.8);">Multimeter Zero-Point Shift</span><span>+2.00 kΩ</span></div>
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-row">
+          <label for="samplesSlider" class="slider-label">
+            <span class="dot" style="background:var(--cyan);"></span>
+            Observations Count (N)
+          </label>
+          <span id="samplesVal" class="slider-val" style="background:rgba(34,211,238,0.1);color:#22d3ee;border-color:rgba(34,211,238,0.25);">100 trials</span>
+        </div>
+        <input type="range" id="samplesSlider" min="10" max="500" step="10" value="100" class="range-cyan">
+        <div class="slider-hints"><span>N = 10</span><span>Statistical Sample Size</span><span>N = 500</span></div>
+      </div>
+
+      <div class="info-box">
+        <svg width="18" height="18" fill="none" stroke="#818cf8" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <div><strong>Physics Insight:</strong> High temperature generates chaotic kinetic collisions (random noise → lower precision). Uncalibrated meter offsets all readings in one direction (systematic error → lower accuracy).</div>
+      </div>
+    </div>
+
+    <!-- Metric Cards -->
+    <div class="col-7 grid-2">
+
+      <div class="metric-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <span class="metric-label">Nominal Standard</span>
+          <span class="badge" style="background:rgba(99,102,241,0.1);color:#818cf8;border-color:rgba(99,102,241,0.2);">R_nominal</span>
+        </div>
+        <div>
+          <div id="statExpected" class="metric-value" style="color:#818cf8;">5.600 kΩ</div>
+          <div class="metric-detail" style="margin-top:0.3rem;">Decoded Color Code Target Value</div>
+        </div>
+        <div class="metric-footer">
+          <span>Color Code:</span>
+          <span id="colorCodeText" class="font-mono" style="color:#e2e8f0;font-size:0.62rem;">Green-Blue-Red-Gold</span>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <span class="metric-label">Average Measured (R̄)</span>
+          <span class="badge" style="background:rgba(16,185,129,0.1);color:#34d399;border-color:rgba(16,185,129,0.2);">R_avg</span>
+        </div>
+        <div>
+          <div id="statAverage" class="metric-value" style="color:#fff;">5.752 kΩ</div>
+          <div id="statSpread" class="metric-detail" style="margin-top:0.3rem;">Min: — | Max: —</div>
+        </div>
+        <div class="metric-footer">
+          <span>Absolute Uncertainty (ΔR):</span>
+          <span id="statDeltaR" class="font-mono" style="color:#34d399;font-weight:700;font-size:0.62rem;">±0.000 kΩ</span>
+        </div>
+      </div>
+
+      <div class="metric-card" style="border-left:3px solid var(--cyan);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <span class="metric-label">Precision Metric</span>
+            <div class="metric-sub" style="color:var(--cyan);">Relative Uncertainty</div>
+          </div>
+          <span class="badge" style="background:rgba(34,211,238,0.1);color:#22d3ee;border-color:rgba(34,211,238,0.2);">|ΔR/R̄|</span>
+        </div>
+        <div>
+          <div id="statPrecisionPct" class="metric-value" style="color:var(--cyan);">0.000%</div>
+          <div id="statPrecisionFrac" class="metric-detail font-mono" style="margin-top:0.3rem;">Fractional: 0.00000</div>
+        </div>
+        <div class="metric-footer">
+          <span>Scatter Spread:</span>
+          <span id="precisionBadge" class="badge" style="background:rgba(34,211,238,0.15);color:#67e8f9;">HIGH PRECISION</span>
+        </div>
+      </div>
+
+      <div class="metric-card" style="border-left:3px solid var(--amber);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <span class="metric-label">Accuracy Metric</span>
+            <div class="metric-sub" style="color:var(--amber);">Relative Error</div>
+          </div>
+          <span class="badge" style="background:rgba(245,158,11,0.1);color:#fbbf24;border-color:rgba(245,158,11,0.2);">(R̄−R₀)/R₀</span>
+        </div>
+        <div>
+          <div id="statAccuracyPct" class="metric-value" style="color:var(--amber);">+0.000%</div>
+          <div id="statAccuracyFrac" class="metric-detail font-mono" style="margin-top:0.3rem;">Fractional: +0.00000</div>
+        </div>
+        <div class="metric-footer">
+          <span>Bias Status:</span>
+          <span id="accuracyBadge" class="badge" style="background:rgba(245,158,11,0.15);color:#fde68a;">SYSTEMATIC BIAS</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- PANEL ROW: Lattice + Meter + Color Band -->
+  <div class="grid-12">
+
+    <!-- Panel A: Electron Lattice -->
+    <div class="panel col-5">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span class="dot dot-pulse" style="background:var(--red);"></span>
+          Panel A — Electron Collision Canvas
+        </div>
+        <span class="badge font-mono" style="background:rgba(127,29,29,0.35);color:#f87171;border-color:rgba(239,68,68,0.3);">Thermal Motion Active</span>
+      </div>
+      <p style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.75rem;">
+        Free electrons (cyan) collide with vibrating Cu⁺ lattice ions (orange). Higher temperature → faster chaotic collisions → Johnson-Nyquist thermal noise.
+      </p>
+      <div class="canvas-wrap" style="height:220px;">
+        <canvas id="thermalCanvas" style="width:100%;height:100%;display:block;"></canvas>
+        <div class="canvas-overlay" style="bottom:8px;left:8px;">
+          Temp: <span id="canvasTempDisplay" style="color:#f87171;font-weight:700;">300 K</span>
+          &nbsp;|&nbsp; Speed: <span id="canvasSpeedDisplay" style="color:#22d3ee;font-weight:700;">2.2 px/f</span>
+        </div>
+        <div class="canvas-overlay" style="bottom:8px;right:8px;">
+          Jitter: <span id="canvasJitterDisplay" style="color:#34d399;font-weight:700;">±0.015 kΩ</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel B1 + B2 stacked -->
+    <div class="col-7" style="display:flex;flex-direction:column;gap:1.25rem;">
+
+      <!-- Panel B1: Multimeter Dial -->
+      <div class="panel" style="flex:1;">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span id="meterStatusDot" class="dot" style="background:var(--amber);"></span>
+            Panel B — Multimeter Calibration State
+          </div>
+          <span id="meterBadge" class="badge font-mono" style="background:rgba(120,53,15,0.35);color:#fbbf24;border-color:rgba(245,158,11,0.3);">UNCALIBRATED METER</span>
+        </div>
+        <p style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.5rem;">
+          Fixed offset error from improper zero-point adjustment or internal lead resistance.
+        </p>
+        <div class="canvas-wrap" style="height:auto;padding:0.5rem;display:flex;flex-direction:column;gap:0.5rem;">
+          <canvas id="meterCanvas" style="width:100%;height:110px;display:block;"></canvas>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;border-top:1px solid #1e293b;padding-top:0.5rem;">
+            <div style="background:#0f172a;padding:0.4rem;border-radius:0.5rem;border:1px solid #1e293b;text-align:center;">
+              <span style="font-size:0.58rem;color:#64748b;display:block;text-transform:uppercase;font-family:monospace;">True Nominal</span>
+              <span id="meterTrueVal" class="font-mono" style="font-size:0.85rem;font-weight:800;color:#818cf8;">5.600 kΩ</span>
+            </div>
+            <div id="meterBox" style="background:rgba(120,53,15,0.2);padding:0.4rem;border-radius:0.5rem;border:1px solid rgba(245,158,11,0.3);text-align:center;">
+              <span style="font-size:0.58rem;color:rgba(251,191,36,0.7);display:block;text-transform:uppercase;font-family:monospace;">Systematic Offset</span>
+              <span id="meterOffsetReadout" class="font-mono" style="font-size:0.85rem;font-weight:800;color:#fbbf24;">+0.150 kΩ Shift</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel B2: Resistor Color Band Visualizer -->
+      <div class="panel" style="flex:1;">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span class="dot" style="background:var(--indigo);"></span>
+            Resistor Color Band Decoder
+          </div>
+          <span id="colorBandBadge" class="badge font-mono" style="background:rgba(99,102,241,0.1);color:#818cf8;border-color:rgba(99,102,241,0.25);">4-BAND E12</span>
+        </div>
+        <p style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.6rem;">
+          The 4 color bands correspond to the nominal resistance set by the slider. Updates live as you drag.
+        </p>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:0.6rem;">
+          <svg id="resistorSVG" viewBox="0 0 320 80" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:340px;height:auto;">
+            <!-- Leads -->
+            <line x1="0" y1="40" x2="36" y2="40" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
+            <line x1="284" y1="40" x2="320" y2="40" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
+            <!-- Body shadow -->
+            <rect x="36" y="31" width="248" height="21" rx="10.5" fill="rgba(0,0,0,0.3)"/>
+            <!-- Body -->
+            <rect x="36" y="28" width="248" height="24" rx="12" fill="#d4b896" stroke="#b8956a" stroke-width="1.5"/>
+            <!-- Bands -->
+            <rect id="band1" x="62"  y="28" width="20" height="24" rx="2" fill="#1a1a1a"/>
+            <rect id="band2" x="93"  y="28" width="20" height="24" rx="2" fill="#1a1a1a"/>
+            <rect id="band3" x="124" y="28" width="20" height="24" rx="2" fill="#1a1a1a"/>
+            <!-- Gap before tolerance -->
+            <rect id="band4" x="218" y="28" width="22" height="24" rx="2" fill="#b45309"/>
+            <!-- Labels under bands -->
+            <text id="band1Label" x="72"  y="67" text-anchor="middle" font-size="7" fill="#94a3b8" font-family="monospace">1st</text>
+            <text id="band2Label" x="103" y="67" text-anchor="middle" font-size="7" fill="#94a3b8" font-family="monospace">2nd</text>
+            <text id="band3Label" x="134" y="67" text-anchor="middle" font-size="7" fill="#94a3b8" font-family="monospace">×Mult</text>
+            <text id="band4Label" x="229" y="67" text-anchor="middle" font-size="7" fill="#94a3b8" font-family="monospace">Tol</text>
+          </svg>
+          <div class="band-legend" id="bandLegend"></div>
+          <div id="resistorValueReadout" style="font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:#94a3b8;text-align:center;"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- PANEL ROW: Dartboard + Histogram -->
+  <div class="grid-12">
+
+    <!-- Panel C: Dartboard -->
+    <div class="panel col-5">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span class="dot" style="background:var(--cyan);"></span>
+          Panel C — 2D Measurement Scatter
+        </div>
+        <span class="badge" style="background:#1e293b;color:#94a3b8;border-color:#334155;">Accuracy vs Precision</span>
+      </div>
+      <p style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.5rem;">
+        Bullseye = Nominal standard. Darts = individual trials. Centroid (●) = measured mean. Both axes use independent Gaussian scatter for a smooth 2D cloud.
+      </p>
+      <div style="display:flex;gap:1rem;font-size:0.62rem;font-family:monospace;margin-bottom:0.5rem;flex-wrap:wrap;">
+        <span style="display:flex;align-items:center;gap:0.35rem;color:#818cf8;"><span style="width:10px;height:10px;border-radius:50%;border:2px solid #818cf8;display:inline-block;"></span>Nominal</span>
+        <span style="display:flex;align-items:center;gap:0.35rem;color:#22d3ee;"><span style="width:8px;height:8px;border-radius:50%;background:#22d3ee;display:inline-block;"></span>Single Trial</span>
+        <span style="display:flex;align-items:center;gap:0.35rem;color:#fbbf24;"><span style="width:10px;height:10px;border-radius:50%;background:#fbbf24;display:inline-block;"></span>Mean Centroid R̄</span>
+      </div>
+      <div class="canvas-wrap" style="height:300px;">
+        <canvas id="targetCanvas" style="width:100%;height:100%;display:block;"></canvas>
+      </div>
+    </div>
+
+    <!-- Panel D: Histogram -->
+    <div class="panel col-7">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span class="dot" style="background:var(--indigo);"></span>
+          Panel D — Measurement Distribution Histogram
+        </div>
+        <div style="display:flex;gap:0.75rem;font-size:0.62rem;font-family:monospace;flex-wrap:wrap;">
+          <span style="display:flex;align-items:center;gap:0.3rem;color:#818cf8;"><span style="width:14px;height:0;border-top:2px dashed #818cf8;display:inline-block;"></span>Nominal</span>
+          <span style="display:flex;align-items:center;gap:0.3rem;color:#34d399;"><span style="width:14px;height:2px;background:#34d399;display:inline-block;"></span>Measured Mean</span>
+        </div>
+      </div>
+      <p style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.75rem;">
+        Gaussian bell formed by N repeated trials. Broader curves = higher noise (lower precision). Shifted peaks = systematic error (lower accuracy).
+      </p>
+      <div style="position:relative;width:100%;height:300px;">
+        <canvas id="histogramChart"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- /app -->
+
+<script>
+/* ============================================================
+ *  RESISTOR COLOR BAND ENCODING
+ * ============================================================ */
+const DIGIT_BANDS = [
+  { name:'Black',  hex:'#1a1a1a', d:0 },
+  { name:'Brown',  hex:'#7c4a1e', d:1 },
+  { name:'Red',    hex:'#dc2626', d:2 },
+  { name:'Orange', hex:'#ea580c', d:3 },
+  { name:'Yellow', hex:'#ca8a04', d:4 },
+  { name:'Green',  hex:'#166534', d:5 },
+  { name:'Blue',   hex:'#1d4ed8', d:6 },
+  { name:'Violet', hex:'#6d28d9', d:7 },
+  { name:'Grey',   hex:'#374151', d:8 },
+  { name:'White',  hex:'#e2e8f0', d:9 },
+];
+
+const MULT_BANDS = [
+  { name:'Black',  hex:'#1a1a1a', m:1        },
+  { name:'Brown',  hex:'#7c4a1e', m:10       },
+  { name:'Red',    hex:'#dc2626', m:100      },
+  { name:'Orange', hex:'#ea580c', m:1000     },
+  { name:'Yellow', hex:'#ca8a04', m:10000    },
+  { name:'Green',  hex:'#166534', m:100000   },
+  { name:'Blue',   hex:'#1d4ed8', m:1000000  },
+  { name:'Gold',   hex:'#b45309', m:0.1      },
+  { name:'Silver', hex:'#6b7280', m:0.01     },
+];
+
+const TOL_GOLD = { name:'Gold', hex:'#b45309', tol:'±5%' };
+
+function encodeResistor4Band(ohms) {
+  // Normalise to 2 significant digits + multiplier
+  const exp = Math.floor(Math.log10(ohms));
+  const mult = Math.pow(10, exp - 1);
+  const mantissa = Math.round(ohms / mult);
+  const d1 = Math.floor(mantissa / 10) % 10;
+  const d2 = mantissa % 10;
+  const b1 = DIGIT_BANDS[d1];
+  const b2 = DIGIT_BANDS[d2];
+  const b3 = MULT_BANDS.reduce((best, cur) =>
+    Math.abs(cur.m - mult) < Math.abs(best.m - mult) ? cur : best);
+  return { b1, b2, b3, b4: TOL_GOLD };
+}
+
+function fmtMult(m) {
+  if (m >= 1e6) return (m/1e6).toFixed(0)+'M';
+  if (m >= 1e3) return (m/1e3).toFixed(0)+'k';
+  if (m >= 1)   return m.toFixed(0);
+  return m.toString();
+}
+
+function renderColorBands(nomKOhm) {
+  const ohms = nomKOhm * 1000;
+  const { b1, b2, b3, b4 } = encodeResistor4Band(ohms);
+
+  document.getElementById('band1').setAttribute('fill', b1.hex);
+  document.getElementById('band2').setAttribute('fill', b2.hex);
+  document.getElementById('band3').setAttribute('fill', b3.hex);
+  document.getElementById('band4').setAttribute('fill', b4.hex);
+
+  // Band text labels — abbreviated under SVG
+  document.getElementById('band1Label').textContent = b1.name.slice(0,3);
+  document.getElementById('band2Label').textContent = b2.name.slice(0,3);
+  document.getElementById('band3Label').textContent = '×'+fmtMult(b3.m);
+  document.getElementById('band4Label').textContent = b4.tol;
+
+  // Legend row
+  const items = [
+    { label:'B1: '+b1.name+' ('+b1.d+')', hex:b1.hex },
+    { label:'B2: '+b2.name+' ('+b2.d+')', hex:b2.hex },
+    { label:'B3: '+b3.name+' (×'+fmtMult(b3.m)+')', hex:b3.hex },
+    { label:'B4: '+b4.name+' ('+b4.tol+')', hex:b4.hex },
+  ];
+  document.getElementById('bandLegend').innerHTML = items.map(it =>
+    `<span class="band-legend-item">
+      <span class="band-swatch" style="background:${it.hex};"></span>${it.label}
+    </span>`).join('');
+
+  // Readout
+  document.getElementById('resistorValueReadout').textContent =
+    `Decoded: ${b1.d}${b2.d} × ${fmtMult(b3.m)} Ω = ${nomKOhm.toFixed(2)} kΩ  (${b4.tol})`;
+
+  // Header card color code text
+  document.getElementById('colorCodeText').textContent =
+    b1.name+'-'+b2.name+'-'+b3.name+'-'+b4.name;
+
+  document.getElementById('colorBandBadge').textContent =
+    [b1,b2,b3,b4].map(b=>b.name.slice(0,3).toUpperCase()).join('-');
+}
+
+/* ============================================================
+ *  GAUSSIAN RNG — Box-Muller
+ * ============================================================ */
+function gaussian(mean, std) {
+  let u, v;
+  do { u = Math.random(); } while (u === 0);
+  do { v = Math.random(); } while (v === 0);
+  return mean + std * Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
+}
+
+function noiseFromTemp(T) { return 0.015 * Math.sqrt(T / 300); }
+
+/* ============================================================
+ *  PANEL A — THERMAL ELECTRON LATTICE
+ * ============================================================ */
+const thermalCanvas = document.getElementById('thermalCanvas');
+const tCtx = thermalCanvas.getContext('2d');
+let latticeAtoms=[], electrons=[], rafId=null;
+const ROWS=3, COLS=8, NELEC=32;
+
+function initLattice() {
+  const w = thermalCanvas.offsetWidth, h = thermalCanvas.offsetHeight;
+  thermalCanvas.width = w; thermalCanvas.height = h;
+  const px=36,py=36,sx=(w-px*2)/Math.max(1,COLS-1),sy=(h-py*2)/Math.max(1,ROWS-1);
+  latticeAtoms = [];
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++)
+    latticeAtoms.push({bx:px+c*sx, by:py+r*sy, x:0,y:0, phase:Math.random()*Math.PI*2});
+  const T=parseFloat(document.getElementById('tempSlider').value);
+  const spd=Math.sqrt(T/300)*2.2;
+  electrons = Array.from({length:NELEC},()=>{
+    const a=Math.random()*Math.PI*2;
+    return {x:20+Math.random()*(w-40), y:10+Math.random()*(h-20), vx:Math.cos(a)*spd, vy:Math.sin(a)*spd, trail:[]};
+  });
+}
+
+function drawLattice() {
+  const w=thermalCanvas.width, h=thermalCanvas.height;
+  const T=parseFloat(document.getElementById('tempSlider').value);
+  const ratio=T/300, spd=Math.sqrt(ratio)*2.2, vib=Math.min(9,ratio*2.8);
+  const t=Date.now()*0.005*Math.sqrt(ratio);
+  tCtx.clearRect(0,0,w,h);
+
+  const heat=Math.min(1,T/700);
+  const grad=tCtx.createLinearGradient(0,0,w,0);
+  grad.addColorStop(0,'#1e1b4b');
+  grad.addColorStop(0.5,`rgba(${Math.floor(130*heat+20)},15,35,0.7)`);
+  grad.addColorStop(1,'#1e1b4b');
+  tCtx.fillStyle=grad; tCtx.fillRect(0,0,w,h);
+
+  tCtx.fillStyle='#475569';
+  tCtx.fillRect(0,0,12,h); tCtx.fillRect(w-12,0,12,h);
+
+  // Ions
+  latticeAtoms.forEach(a=>{
+    a.x=a.bx+Math.sin(t+a.phase)*vib;
+    a.y=a.by+Math.cos(t*1.3+a.phase)*vib;
+  });
+  // Bond lines
+  for(let i=0;i<latticeAtoms.length;i++){
+    for(let j=i+1;j<latticeAtoms.length;j++){
+      if(Math.hypot(latticeAtoms[i].x-latticeAtoms[j].x,latticeAtoms[i].y-latticeAtoms[j].y)<80){
+        tCtx.beginPath(); tCtx.moveTo(latticeAtoms[i].x,latticeAtoms[i].y); tCtx.lineTo(latticeAtoms[j].x,latticeAtoms[j].y);
+        tCtx.strokeStyle='rgba(100,80,60,0.15)'; tCtx.lineWidth=0.8; tCtx.stroke();
+      }
+    }
+  }
+  latticeAtoms.forEach(atom=>{
+    tCtx.beginPath(); tCtx.arc(atom.x,atom.y,10,0,Math.PI*2);
+    tCtx.fillStyle=T>450?'#f97316':'#c2410c'; tCtx.fill();
+    tCtx.strokeStyle='#fed7aa'; tCtx.lineWidth=1.5; tCtx.stroke();
+    tCtx.fillStyle='#fff'; tCtx.font='bold 8px sans-serif';
+    tCtx.textAlign='center'; tCtx.textBaseline='middle';
+    tCtx.fillText('Cu⁺',atom.x,atom.y);
+  });
+
+  electrons.forEach(el=>{
+    const cs=Math.hypot(el.vx,el.vy);
+    if(cs>0){el.vx=el.vx/cs*spd; el.vy=el.vy/cs*spd;}
+    el.x+=el.vx; el.y+=el.vy;
+    if(el.x<14||el.x>w-14){el.vx*=-1; el.x=Math.max(14,Math.min(w-14,el.x));}
+    if(el.y<8 ||el.y>h-8) {el.vy*=-1; el.y=Math.max(8, Math.min(h-8, el.y));}
+    latticeAtoms.forEach(atom=>{
+      if(Math.hypot(el.x-atom.x,el.y-atom.y)<16){
+        const a2=Math.atan2(el.y-atom.y,el.x-atom.x)+(Math.random()-0.5)*1.2;
+        el.vx=Math.cos(a2)*spd; el.vy=Math.sin(a2)*spd;
+      }
+    });
+    el.trail.push({x:el.x,y:el.y});
+    if(el.trail.length>6) el.trail.shift();
+    if(el.trail.length>1){
+      tCtx.beginPath(); tCtx.moveTo(el.trail[0].x,el.trail[0].y);
+      el.trail.forEach(p=>tCtx.lineTo(p.x,p.y));
+      tCtx.strokeStyle='rgba(34,211,238,0.33)'; tCtx.lineWidth=1.5; tCtx.stroke();
+    }
+    tCtx.shadowColor='#06b6d4'; tCtx.shadowBlur=10;
+    tCtx.beginPath(); tCtx.arc(el.x,el.y,4,0,Math.PI*2);
+    tCtx.fillStyle='#22d3ee'; tCtx.fill();
+    tCtx.shadowBlur=0;
+  });
+
+  document.getElementById('canvasTempDisplay').textContent=Math.round(T)+' K';
+  document.getElementById('canvasSpeedDisplay').textContent=spd.toFixed(1)+' px/f';
+  rafId=requestAnimationFrame(drawLattice);
+}
+
+/* ============================================================
+ *  PANEL B — MULTIMETER DIAL
+ * ============================================================ */
+const meterCanvas=document.getElementById('meterCanvas');
+const mCtx=meterCanvas.getContext('2d');
+
+function renderMeterDial(sysOff) {
+  const w=meterCanvas.offsetWidth, h=meterCanvas.offsetHeight;
+  meterCanvas.width=w; meterCanvas.height=h;
+  const cx=w/2, cy=h+18, R=h*0.85;
+  const minA=Math.PI*1.22, maxA=Math.PI*1.78, zeroA=minA+0.5*(maxA-minA);
+
+  mCtx.clearRect(0,0,w,h);
+  // Track
+  mCtx.beginPath(); mCtx.arc(cx,cy,R,minA,maxA);
+  mCtx.strokeStyle='#1e293b'; mCtx.lineWidth=12; mCtx.stroke();
+
+  // Colored active arc
+  const clamped=Math.max(-2,Math.min(2,sysOff));
+  const needleA=minA+((clamped+2)/4)*(maxA-minA);
+  mCtx.beginPath();
+  mCtx.arc(cx,cy,R,clamped>=0?zeroA:needleA,clamped>=0?needleA:zeroA);
+  mCtx.strokeStyle=clamped>=0?'rgba(16,185,129,0.5)':'rgba(239,68,68,0.45)';
+  mCtx.lineWidth=10; mCtx.stroke();
+
+  // Ticks
+  for(let i=0;i<=20;i++){
+    const a=minA+(i/20)*(maxA-minA);
+    const major=i%5===0;
+    const inner=major?R-18:R-10;
+    mCtx.beginPath();
+    mCtx.moveTo(cx+Math.cos(a)*R,cy+Math.sin(a)*R);
+    mCtx.lineTo(cx+Math.cos(a)*inner,cy+Math.sin(a)*inner);
+    mCtx.strokeStyle=i===10?'#818cf8':'#334155';
+    mCtx.lineWidth=major?2:1; mCtx.stroke();
+  }
+  // Zero label
+  mCtx.fillStyle='#818cf8'; mCtx.font='9px monospace'; mCtx.textAlign='center';
+  mCtx.fillText('0',cx+Math.cos(zeroA)*(R-26),cy+Math.sin(zeroA)*(R-26));
+
+  // Needle
+  mCtx.beginPath();
+  mCtx.moveTo(cx,cy); mCtx.lineTo(cx+Math.cos(needleA)*(R-5),cy+Math.sin(needleA)*(R-5));
+  mCtx.strokeStyle=Math.abs(sysOff)<0.02?'#10b981':'#f59e0b';
+  mCtx.lineWidth=3; mCtx.lineCap='round'; mCtx.stroke();
+
+  // Pivot
+  mCtx.beginPath(); mCtx.arc(cx,cy,7,0,Math.PI*2);
+  mCtx.fillStyle='#f1f5f9'; mCtx.fill();
+
+  // Canvas badge
+  const bad=Math.abs(sysOff)>=0.02;
+  mCtx.fillStyle=bad?'rgba(245,158,11,0.1)':'rgba(16,185,129,0.1)';
+  mCtx.strokeStyle=bad?'rgba(245,158,11,0.4)':'rgba(16,185,129,0.4)';
+  mCtx.lineWidth=1;
+  mCtx.beginPath(); mCtx.roundRect(8,6,bad?172:150,20,5); mCtx.fill(); mCtx.stroke();
+  mCtx.fillStyle=bad?'#fbbf24':'#34d399';
+  mCtx.font='bold 9px monospace'; mCtx.textAlign='left';
+  mCtx.fillText(bad?'⚠  BAD CALIBRATION OFFSET':'✓  CALIBRATED ZERO',16,19);
+}
+
+/* ============================================================
+ *  PANEL C — 2D DARTBOARD (PROPER BIVARIATE GAUSSIAN)
+ * ============================================================ */
+const targetCanvas=document.getElementById('targetCanvas');
+const tgtCtx=targetCanvas.getContext('2d');
+
+/**
+ * Fix: scatter uses TWO independent Gaussian axes.
+ *  X = actual resistance error from measured distribution (biased by sys offset)
+ *  Y = independent zero-mean probe-contact noise, std = yStdFrac × noiseStd
+ *
+ * This eliminates the "golden-angle fan" arc artefact that occurred when Y
+ * was deterministically derived from the trial index.
+ */
+function renderDartboard(measurements, nominalR, avgR, noiseStd) {
+  const w=targetCanvas.offsetWidth, h=targetCanvas.offsetHeight;
+  targetCanvas.width=w; targetCanvas.height=h;
+  const cx=w/2, cy=h/2;
+  const sysErr=Math.abs(avgR-nominalR);
+  const maxSpread=Math.max(0.15, sysErr+noiseStd*3.5);
+  const scale=(Math.min(w,h)*0.37)/maxSpread;
+  const yStd=noiseStd*0.8; // independent Y noise
+
+  tgtCtx.clearRect(0,0,w,h);
+
+  // Rings
+  [1.0,0.75,0.5,0.25].forEach((f,i)=>{
+    const fills=['rgba(51,65,85,0.07)','rgba(51,65,85,0.12)','rgba(99,102,241,0.09)','rgba(99,102,241,0.18)'];
+    tgtCtx.beginPath(); tgtCtx.arc(cx,cy,maxSpread*f*scale,0,Math.PI*2);
+    tgtCtx.fillStyle=fills[i]; tgtCtx.fill();
+    tgtCtx.strokeStyle='rgba(99,102,241,0.2)'; tgtCtx.lineWidth=1; tgtCtx.stroke();
+  });
+
+  // Crosshairs
+  tgtCtx.beginPath();
+  tgtCtx.moveTo(0,cy); tgtCtx.lineTo(w,cy);
+  tgtCtx.moveTo(cx,0); tgtCtx.lineTo(cx,h);
+  tgtCtx.strokeStyle='rgba(148,163,184,0.1)'; tgtCtx.lineWidth=1; tgtCtx.stroke();
+
+  // Bullseye
+  tgtCtx.beginPath(); tgtCtx.arc(cx,cy,6,0,Math.PI*2);
+  tgtCtx.fillStyle='#6366f1'; tgtCtx.fill();
+  tgtCtx.strokeStyle='#fff'; tgtCtx.lineWidth=2; tgtCtx.stroke();
+
+  // Darts — independent Y Gaussian per point
+  let sumYErr=0;
+  const pts=measurements.map(val=>{
+    const xErr=val-nominalR;
+    const yErr=gaussian(0,yStd); // fully independent Y
+    sumYErr+=yErr;
+    return {xErr, yErr};
+  });
+
+  pts.forEach(({xErr,yErr})=>{
+    const px=cx+xErr*scale, py=cy+yErr*scale;
+    if(px<3||px>w-3||py<3||py>h-3) return;
+    tgtCtx.beginPath(); tgtCtx.arc(px,py,2.8,0,Math.PI*2);
+    tgtCtx.fillStyle='rgba(34,211,238,0.62)'; tgtCtx.fill();
+  });
+
+  // Centroid
+  const meanXErr=avgR-nominalR;
+  const meanYErr=sumYErr/measurements.length;
+  const cgx=cx+meanXErr*scale, cgy=cy+meanYErr*scale;
+
+  if(Math.abs(meanXErr)>0.005||Math.abs(meanYErr)>0.005){
+    tgtCtx.beginPath(); tgtCtx.moveTo(cx,cy); tgtCtx.lineTo(cgx,cgy);
+    tgtCtx.strokeStyle='#f59e0b'; tgtCtx.lineWidth=2;
+    tgtCtx.setLineDash([5,4]); tgtCtx.stroke(); tgtCtx.setLineDash([]);
+  }
+
+  tgtCtx.beginPath(); tgtCtx.arc(cgx,cgy,7,0,Math.PI*2);
+  tgtCtx.fillStyle='#f59e0b'; tgtCtx.fill();
+  tgtCtx.strokeStyle='#fff'; tgtCtx.lineWidth=2; tgtCtx.stroke();
+}
+
+/* ============================================================
+ *  PANEL D — HISTOGRAM
+ * ============================================================ */
+let chartInst=null;
+
+function nearestLabel(labels, val) {
+  let best=0, bd=Infinity;
+  labels.forEach((l,i)=>{const d=Math.abs(parseFloat(l)-val);if(d<bd){bd=d;best=i;}});
+  return best;
+}
+
+function renderHistogram(data, nomR, avgR) {
+  const ctx=document.getElementById('histogramChart').getContext('2d');
+  if(!data.length) return;
+  const mn=Math.min(...data), mx=Math.max(...data);
+  const rng=mx-mn||0.01;
+  const bins=data.length<30?8:data.length>300?24:16;
+  const bw=rng/bins, start=mn-bw/2;
+  const buckets=Array.from({length:bins+2},(_,i)=>({min:start+i*bw,max:start+(i+1)*bw,count:0}));
+  data.forEach(v=>{const idx=Math.floor((v-start)/bw); if(idx>=0&&idx<buckets.length)buckets[idx].count++;});
+  const active=buckets.filter((b,i)=>b.count>0||(i>0&&buckets[i-1].count>0)||(i<buckets.length-1&&buckets[i+1].count>0));
+  const labels=active.map(b=>((b.min+b.max)/2).toFixed(3));
+  const counts=active.map(b=>b.count);
+  if(chartInst){chartInst.destroy();chartInst=null;}
+  chartInst=new Chart(ctx,{
+    type:'bar',
+    data:{labels,datasets:[{data:counts,backgroundColor:'rgba(99,102,241,0.45)',borderColor:'#6366f1',borderWidth:1.5,borderRadius:4,hoverBackgroundColor:'rgba(99,102,241,0.75)'}]},
+    options:{
+      responsive:true, maintainAspectRatio:false, animation:{duration:180},
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{title:i=>`~${i[0].label} kΩ`,label:i=>` Count: ${i.raw}`}},
+        annotation:{annotations:{
+          nomLine:{type:'line',scaleID:'x',value:nearestLabel(labels,nomR),borderColor:'#818cf8',borderWidth:2,borderDash:[5,5],
+            label:{display:true,content:`Nominal ${nomR.toFixed(3)} kΩ`,position:'start',backgroundColor:'rgba(15,23,42,0.9)',color:'#818cf8',font:{size:9,weight:'bold'}}},
+          avgLine:{type:'line',scaleID:'x',value:nearestLabel(labels,avgR),borderColor:'#34d399',borderWidth:2.5,
+            label:{display:true,content:`Mean ${avgR.toFixed(3)} kΩ`,position:'end',backgroundColor:'rgba(6,78,59,0.9)',color:'#34d399',font:{size:9,weight:'bold'}}}
+        }}
+      },
+      scales:{
+        x:{title:{display:true,text:'Measured Resistance (kΩ)',color:'#64748b',font:{size:11}},ticks:{color:'#475569',font:{size:10},maxTicksLimit:12},grid:{color:'rgba(51,65,85,0.22)'}},
+        y:{title:{display:true,text:'Frequency',color:'#64748b',font:{size:11}},ticks:{color:'#475569',font:{size:10},precision:0},grid:{color:'rgba(51,65,85,0.22)'},beginAtZero:true}
+      }
+    }
+  });
+}
+
+/* ============================================================
+ *  CORE SIMULATION UPDATE
+ * ============================================================ */
+let measurements=[];
+
+function updateSim() {
+  const nomR   = parseFloat(document.getElementById('nominalSlider').value);
+  const tempK  = parseFloat(document.getElementById('tempSlider').value);
+  const sysOff = parseFloat(document.getElementById('systematicSlider').value);
+  const N      = parseInt(document.getElementById('samplesSlider').value, 10);
+  const noiseS = noiseFromTemp(tempK);
+  const trueMu = nomR + sysOff;
+
+  document.getElementById('nominalVal').textContent    = nomR.toFixed(3)+' kΩ';
+  document.getElementById('tempVal').textContent       = `${Math.round(tempK)} K (${Math.round(tempK-273.15)}°C)`;
+  document.getElementById('systematicVal').textContent = (sysOff>=0?'+':'')+sysOff.toFixed(3)+' kΩ';
+  document.getElementById('samplesVal').textContent    = N+' trials';
+  document.getElementById('canvasJitterDisplay').textContent = '±'+noiseS.toFixed(3)+' kΩ';
+
+  measurements = Array.from({length:N}, ()=>gaussian(trueMu, noiseS));
+  const sum=measurements.reduce((s,v)=>s+v,0);
+  const avgR=sum/N;
+  const minR=Math.min(...measurements), maxR=Math.max(...measurements);
+  const deltaR=(maxR-minR)/2;
+  const relUnc=Math.abs(deltaR/avgR);
+  const relErr=(avgR-nomR)/nomR;
+
+  document.getElementById('statExpected').textContent   = nomR.toFixed(3)+' kΩ';
+  document.getElementById('statAverage').textContent    = avgR.toFixed(3)+' kΩ';
+  document.getElementById('statSpread').textContent     = `Min: ${minR.toFixed(3)} kΩ | Max: ${maxR.toFixed(3)} kΩ`;
+  document.getElementById('statDeltaR').textContent     = '±'+deltaR.toFixed(3)+' kΩ';
+  document.getElementById('statPrecisionPct').textContent  = (relUnc*100).toFixed(3)+'%';
+  document.getElementById('statPrecisionFrac').textContent = 'Fractional: '+relUnc.toFixed(5);
+  document.getElementById('statAccuracyPct').textContent   = (relErr>=0?'+':'')+(relErr*100).toFixed(3)+'%';
+  document.getElementById('statAccuracyFrac').textContent  = 'Fractional: '+(relErr>=0?'+':'')+relErr.toFixed(5);
+
+  const pb=document.getElementById('precisionBadge');
+  if(relUnc*100<0.8)      {pb.textContent='HIGH PRECISION';       pb.style.cssText='background:rgba(34,211,238,0.15);color:#67e8f9;';}
+  else if(relUnc*100<2.0) {pb.textContent='MODERATE SCATTER';     pb.style.cssText='background:rgba(99,102,241,0.15);color:#a5b4fc;';}
+  else                    {pb.textContent='HIGH NOISE / LOW PREC';pb.style.cssText='background:rgba(239,68,68,0.15);color:#fca5a5;';}
+
+  const ab=document.getElementById('accuracyBadge');
+  if(Math.abs(sysOff)<0.02){
+    ab.textContent='ACCURATE (NO BIAS)'; ab.style.cssText='background:rgba(16,185,129,0.15);color:#6ee7b7;';
+    document.getElementById('meterStatusDot').style.background='#10b981';
+    document.getElementById('meterBadge').textContent='CALIBRATED METER';
+    document.getElementById('meterBadge').style.cssText='background:rgba(6,78,59,0.4);color:#34d399;border-color:rgba(16,185,129,0.3);';
+    document.getElementById('meterBox').style.cssText='background:rgba(6,78,59,0.2);padding:.4rem;border-radius:.5rem;border:1px solid rgba(16,185,129,0.3);text-align:center;';
+    document.getElementById('meterOffsetReadout').style.color='#34d399';
+  } else {
+    ab.textContent='SYSTEMATIC BIAS'; ab.style.cssText='background:rgba(245,158,11,0.15);color:#fde68a;';
+    document.getElementById('meterStatusDot').style.background='#f59e0b';
+    document.getElementById('meterBadge').textContent='UNCALIBRATED METER';
+    document.getElementById('meterBadge').style.cssText='background:rgba(120,53,15,0.4);color:#fbbf24;border-color:rgba(245,158,11,0.3);';
+    document.getElementById('meterBox').style.cssText='background:rgba(120,53,15,0.2);padding:.4rem;border-radius:.5rem;border:1px solid rgba(245,158,11,0.3);text-align:center;';
+    document.getElementById('meterOffsetReadout').style.color='#fbbf24';
+  }
+
+  document.getElementById('meterTrueVal').textContent      = nomR.toFixed(3)+' kΩ';
+  document.getElementById('meterOffsetReadout').textContent = (sysOff>=0?'+':'')+sysOff.toFixed(3)+' kΩ Shift';
+
+  renderColorBands(nomR);
+  renderMeterDial(sysOff);
+  renderDartboard(measurements, nomR, avgR, noiseS);
+  renderHistogram(measurements, nomR, avgR);
+}
+
+/* ============================================================
+ *  BOOT
+ * ============================================================ */
+function resizeAndReinit() {
+  if(rafId) cancelAnimationFrame(rafId);
+  initLattice();
+  drawLattice();
+  updateSim();
+}
+
+['nominalSlider','tempSlider','systematicSlider','samplesSlider'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', updateSim);
+});
+document.getElementById('resampleBtn').addEventListener('click', updateSim);
+
+window.addEventListener('resize', ()=>{
+  clearTimeout(window._rt);
+  window._rt=setTimeout(resizeAndReinit, 150);
+});
+
+resizeAndReinit();
+</script>
+</body>
+</html>
