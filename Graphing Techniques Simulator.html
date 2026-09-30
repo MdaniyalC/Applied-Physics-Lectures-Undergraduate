@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Physics Graphing Techniques Simulator</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f3f4f6;
+      color: #1f2937;
+      padding: 20px;
+    }
+    .app-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: #1e293b;
+      color: #ffffff;
+      padding: 20px 28px;
+      border-bottom: 3px solid #3b82f6;
+    }
+    header h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    header p {
+      font-size: 14px;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+    .main-content {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 20px;
+      padding: 24px;
+    }
+    @media (max-width: 900px) {
+      .main-content {
+        grid-template-columns: 1fr;
+      }
+    }
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card h3 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #334155;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .form-group {
+      margin-bottom: 12px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: #475569;
+      margin-bottom: 6px;
+    }
+    select, input[type="range"] {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 13px;
+      background-color: #ffffff;
+    }
+    input[type="range"] {
+      padding: 0;
+      cursor: pointer;
+    }
+    .toggle-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #334155;
+      cursor: pointer;
+    }
+    .checkbox-label input {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+    .stat-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      background: #e2e8f0;
+      color: #334155;
+    }
+    .stat-badge.good {
+      background: #dcfce7;
+      color: #166534;
+    }
+    .stat-badge.warn {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    .canvas-container {
+      position: relative;
+      background: #ffffff;
+      border: 2px solid #cbd5e1;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: inset 0 2px 6px rgba(0,0,0,0.03);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+    }
+    canvas {
+      background-color: #ffffff;
+      cursor: crosshair;
+    }
+    .instructions-card {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e40af;
+      padding: 12px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+<div class="app-container">
+  <header>
+    <h1>Physics Graphing Techniques Simulator</h1>
+    <p>Demonstrating standard experimental plotting rules, millimeter cross-section grid scales, manual line-fitting, and data trend analysis.</p>
+  </header>
+
+  <div class="main-content">
+    <div class="sidebar">
+      <!-- Plot Variable Controls -->
+      <div class="card">
+        <h3>1. Variables & Axes</h3>
+        <div class="form-group">
+          <label for="axisOrientation">Plot Convention:</label>
+          <select id="axisOrientation" onchange="updateSimulation()">
+            <option value="correct">Correct: Voltage (V) vs Current (I)</option>
+            <option value="swapped">Incorrect: Current (I) vs Voltage (V)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="scaleChoice">Axis Division Scale (1, 2, 5 Rule):</label>
+          <select id="scaleChoice" onchange="updateSimulation()">
+            <option value="1">Standard: 1 div = 1.0 V (Clean Rule)</option>
+            <option value="2">Standard: 1 div = 2.0 V (Clean Rule)</option>
+            <option value="5">Standard: 1 div = 0.5 V (Clean Rule)</option>
+            <option value="bad">Awkward: 1 div = 0.37 V (Bad Practice)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Line Fitting & Ruler -->
+      <div class="card">
+        <h3>2. Manual Ruler Fitting</h3>
+        <div class="form-group">
+          <label>Ruler Slope ($m$): <span id="slopeVal">1.20</span></label>
+          <input type="range" id="rulerSlope" min="0.2" max="3.0" step="0.05" value="1.2" oninput="updateSimulation()" />
+        </div>
+        <div class="form-group">
+          <label>Ruler Intercept ($c$): <span id="interceptVal">0.50</span></label>
+          <input type="range" id="rulerIntercept" min="-2.0" max="4.0" step="0.1" value="0.5" oninput="updateSimulation()" />
+        </div>
+        <div class="toggle-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="showBestFit" onchange="updateSimulation()" />
+            Show Calculated Best-Fit Line
+          </label>
+        </div>
+      </div>
+
+      <!-- Graphing Best Practices Checklist -->
+      <div class="card">
+        <h3>3. Graphing Conventions</h3>
+        <div class="toggle-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="circleDataPoints" checked onchange="updateSimulation()" />
+            Enclose Dots in Circles ($\odot$)
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="connectDots" onchange="updateSimulation()" />
+            Connect Dots Directly (Incorrect)
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="includeOrigin" checked onchange="updateSimulation()" />
+            Force Include Origin (0,0)
+          </label>
+        </div>
+      </div>
+
+      <!-- Analysis Results -->
+      <div class="card">
+        <h3>4. Balance Metrics</h3>
+        <div style="margin-bottom: 8px;">
+          Points Above Line: <span id="pointsAbove" class="stat-badge">0</span>
+        </div>
+        <div style="margin-bottom: 8px;">
+          Points Below Line: <span id="pointsBelow" class="stat-badge">0</span>
+        </div>
+        <div>
+          Distribution Status: <span id="balanceStatus" class="stat-badge warn">Unbalanced</span>
+        </div>
+      </div>
+
+      <div class="instructions-card">
+        <strong>Teacher Tip:</strong> Adjust the manual ruler sliders to get roughly 50% of points above and 50% below the transparent ruler, evenly distributed along its length.
+      </div>
+    </div>
+
+    <!-- Canvas Area -->
+    <div class="canvas-container">
+      <canvas id="graphCanvas" width="700" height="600"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+  const canvas = document.getElementById('graphCanvas');
+  const ctx = canvas.getContext('2d');
+
+  // Sample experimental dataset: Voltage V (Dependent) vs Current I (Independent)
+  const rawData = [
+    { x: 1.0, y: 1.8 },
+    { x: 2.0, y: 2.7 },
+    { x: 3.0, y: 4.2 },
+    { x: 4.0, y: 5.1 },
+    { x: 5.0, y: 6.8 },
+    { x: 6.0, y: 7.9 },
+    { x: 7.0, y: 8.7 },
+    { x: 8.0, y: 10.3 }
+  ];
+
+  function updateSimulation() {
+    // Read control values
+    const isSwapped = document.getElementById('axisOrientation').value === 'swapped';
+    const scaleRule = document.getElementById('scaleChoice').value;
+    const slope = parseFloat(document.getElementById('rulerSlope').value);
+    const intercept = parseFloat(document.getElementById('rulerIntercept').value);
+    const showBestFit = document.getElementById('showBestFit').checked;
+    const circleData = document.getElementById('circleDataPoints').checked;
+    const connectDots = document.getElementById('connectDots').checked;
+    const includeOrigin = document.getElementById('includeOrigin').checked;
+
+    document.getElementById('slopeVal').innerText = slope.toFixed(2);
+    document.getElementById('interceptVal').innerText = intercept.toFixed(2);
+
+    // Canvas Clearing & Setup
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Margins for graph paper
+    const marginLeft = 80;
+    const marginRight = 40;
+    const marginTop = 60;
+    const marginBottom = 70;
+
+    const plotWidth = canvas.width - marginLeft - marginRight;
+    const plotHeight = canvas.height - marginTop - marginBottom;
+
+    // Draw 1cm x 1cm cross-section graph paper background
+    drawGraphPaper(marginLeft, marginTop, plotWidth, plotHeight);
+
+    // Map axes based on configuration
+    const xMax = 10;
+    const yMax = 12;
+
+    const getXPixel = (val) => marginLeft + (val / xMax) * plotWidth;
+    const getYPixel = (val) => marginTop + plotHeight - (val / yMax) * plotHeight;
+
+    // Draw Axes & Labels
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(marginLeft, marginTop);
+    ctx.lineTo(marginLeft, marginTop + plotHeight);
+    ctx.lineTo(marginLeft + plotWidth, marginTop + plotHeight);
+    ctx.stroke();
+
+    // Axis Titles & Units
+    ctx.fillStyle = '#0f172a';
+    ctx.font = '14px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+
+    const yLabel = isSwapped ? 'Current, I (A)' : 'Voltage, V (V)';
+    const xLabel = isSwapped ? 'Voltage, V (V)' : 'Current, I (A)';
+
+    // X-Axis Title
+    ctx.fillText(xLabel + "  [Abscissa / Independent]", marginLeft + plotWidth / 2, marginTop + plotHeight + 50);
+
+    // Y-Axis Title
+    ctx.save();
+    ctx.translate(marginLeft - 55, marginTop + plotHeight / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText(yLabel + "  [Ordinate / Dependent]", 0, 0);
+    ctx.restore();
+
+    // Main Graph Title
+    ctx.font = 'bold 16px -apple-system, sans-serif';
+    ctx.fillText(`Plot of ${isSwapped ? 'Current vs Voltage' : 'Voltage vs Current'} (Millimeter Grid Scale)`, canvas.width / 2, 30);
+
+    // Axis Ticks and Numbers
+    ctx.font = '11px -apple-system, sans-serif';
+    ctx.fillStyle = '#475569';
+
+    // X-Axis Ticks
+    for (let x = 0; x <= xMax; x += (scaleRule === 'bad' ? 1.37 : 1)) {
+      const px = getXPixel(x);
+      if (px <= marginLeft + plotWidth) {
+        ctx.beginPath();
+        ctx.moveTo(px, marginTop + plotHeight);
+        ctx.lineTo(px, marginTop + plotHeight + 6);
+        ctx.stroke();
+        ctx.fillText(x.toFixed(scaleRule === 'bad' ? 2 : 0), px, marginTop + plotHeight + 20);
+      }
+    }
+
+    // Y-Axis Ticks
+    ctx.textAlign = 'right';
+    for (let y = 0; y <= yMax; y += (scaleRule === 'bad' ? 1.37 : 1)) {
+      const py = getYPixel(y);
+      if (py >= marginTop) {
+        ctx.beginPath();
+        ctx.moveTo(marginLeft - 6, py);
+        ctx.lineTo(marginLeft, py);
+        ctx.stroke();
+        ctx.fillText(y.toFixed(scaleRule === 'bad' ? 2 : 0), marginLeft - 10, py + 4);
+      }
+    }
+
+    // Process Points
+    const mappedPoints = rawData.map(pt => ({
+      x: isSwapped ? pt.y : pt.x,
+      y: isSwapped ? pt.x : pt.y
+    }));
+
+    // Connect dots if bad practice selected
+    if (connectDots) {
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      mappedPoints.forEach((pt, idx) => {
+        const px = getXPixel(pt.x);
+        const py = getYPixel(pt.y);
+        if (idx === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      });
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Draw Data Points
+    mappedPoints.forEach(pt => {
+      const px = getXPixel(pt.x);
+      const py = getYPixel(pt.y);
+
+      // Dot
+      ctx.fillStyle = '#0284c7';
+      ctx.beginPath();
+      ctx.arc(px, py, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Circle around dot
+      if (circleData) {
+        ctx.strokeStyle = '#0284c7';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(px, py, 7, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    });
+
+    // Draw Manual Ruler Line
+    const rX1 = 0;
+    const rY1 = intercept;
+    const rX2 = xMax;
+    const rY2 = slope * xMax + intercept;
+
+    ctx.strokeStyle = 'rgba(234, 88, 12, 0.85)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(getXPixel(rX1), getYPixel(rY1));
+    ctx.lineTo(getXPixel(rX2), getYPixel(rY2));
+    ctx.stroke();
+
+    // Calculate Points Above / Below Manual Ruler Line
+    let aboveCount = 0;
+    let belowCount = 0;
+
+    mappedPoints.forEach(pt => {
+      const expectedY = slope * pt.x + intercept;
+      if (pt.y > expectedY + 0.1) aboveCount++;
+      else if (pt.y < expectedY - 0.1) belowCount++;
+    });
+
+    document.getElementById('pointsAbove').innerText = aboveCount;
+    document.getElementById('pointsBelow').innerText = belowCount;
+
+    const balanceElem = document.getElementById('balanceStatus');
+    if (Math.abs(aboveCount - belowCount) <= 1 && aboveCount > 0) {
+      balanceElem.innerText = "Balanced (~50/50 Spread)";
+      balanceElem.className = "stat-badge good";
+    } else {
+      balanceElem.innerText = "Unbalanced Line Fit";
+      balanceElem.className = "stat-badge warn";
+    }
+
+    // Optional Best-Fit Line (Least Squares)
+    if (showBestFit) {
+      const n = mappedPoints.length;
+      const sumX = mappedPoints.reduce((a, p) => a + p.x, 0);
+      const sumY = mappedPoints.reduce((a, p) => a + p.y, 0);
+      const sumXY = mappedPoints.reduce((a, p) => a + p.x * p.y, 0);
+      const sumXX = mappedPoints.reduce((a, p) => a + p.x * p.x, 0);
+
+      const bestSlope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+      const bestIntercept = (sumY - bestSlope * sumX) / n;
+
+      ctx.strokeStyle = '#16a34a';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(getXPixel(0), getYPixel(bestIntercept));
+      ctx.lineTo(getXPixel(xMax), getYPixel(bestSlope * xMax + bestIntercept));
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  function drawGraphPaper(left, top, width, height) {
+    // Subdivisions (1mm = ~5px, 1cm = ~50px)
+    const subDiv = 5;
+    const majorDiv = 50;
+
+    // Background fill
+    ctx.fillStyle = '#f0fdf4';
+    ctx.fillRect(left, top, width, height);
+
+    // Minor grid lines (1mm)
+    ctx.strokeStyle = '#dcfce7';
+    ctx.lineWidth = 0.5;
+    for (let x = left; x <= left + width; x += subDiv) {
+      ctx.beginPath();
+      ctx.moveTo(x, top);
+      ctx.lineTo(x, top + height);
+      ctx.stroke();
+    }
+    for (let y = top; y <= top + height; y += subDiv) {
+      ctx.beginPath();
+      ctx.moveTo(left, y);
+      ctx.lineTo(left + width, y);
+      ctx.stroke();
+    }
+
+    // Major grid lines (1cm)
+    ctx.strokeStyle = '#86efac';
+    ctx.lineWidth = 1.2;
+    for (let x = left; x <= left + width; x += majorDiv) {
+      ctx.beginPath();
+      ctx.moveTo(x, top);
+      ctx.lineTo(x, top + height);
+      ctx.stroke();
+    }
+    for (let y = top; y <= top + height; y += majorDiv) {
+      ctx.beginPath();
+      ctx.moveTo(left, y);
+      ctx.lineTo(left + width, y);
+      ctx.stroke();
+    }
+  }
+
+  // Initial render on page load
+  window.onload = updateSimulation;
+</script>
+
+</body>
+</html>
